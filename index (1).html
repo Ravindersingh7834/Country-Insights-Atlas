@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Country Insights Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Instrument+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e6eff1;--card:#fbfdfd;--ink:#10303d;--mut:#5a7683;--line:#c3d6db;--accent:#0e7c8b;--mark:#f0b400;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1d26;--card:#12303d;--ink:#e3f0f3;--mut:#93b0ba;--line:#24495a;--accent:#4fc3d3;--mark:#f0b400;color-scheme:dark}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Instrument Sans",system-ui,sans-serif}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;margin:0;line-height:1.1}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+header.top{padding:2.5rem 1.25rem 1.25rem;max-width:1100px;margin:auto}
+header.top h1{font-size:clamp(2.2rem,6vw,4rem);font-weight:800;letter-spacing:-.02em}
+header.top p{color:var(--mut);max-width:52ch;margin:.6rem 0 0}
+main{max-width:1100px;margin:auto;padding:0 1.25rem 4rem}
+.controls{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:.6rem;padding:.8rem 0;background:var(--bg);border-bottom:1px solid var(--line)}
+.controls input,.controls select{font:inherit;padding:.55rem .8rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+.controls input{flex:1 1 220px}
+.count{align-self:center;color:var(--mut);font-size:.9rem;margin-left:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1rem;margin-top:1.2rem}
+.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;opacity:0;transform:translateY(10px);transition:opacity .4s,transform .4s,border-color .2s}
+.card.in{opacity:1;transform:none}
+.card:hover{border-color:var(--accent)}
+.card .flag{aspect-ratio:3/2;background:var(--line);display:block;width:100%;object-fit:cover}
+.card div{padding:.7rem .9rem .9rem}
+.card h3{font-size:1.15rem}
+.card small{color:var(--mut);display:block;margin-top:.2rem}
+.pop{height:4px;background:var(--line);margin-top:.6rem;border-radius:2px}
+.pop i{display:block;height:100%;background:var(--mark);border-radius:2px}
+#sentinel{height:40px}
+.msg{padding:2rem;text-align:center;color:var(--mut)}
+/* detail */
+.back{display:inline-block;margin:1.2rem 0;padding:.4rem .8rem;border:1px solid var(--line);border-radius:8px;text-decoration:none;background:var(--card)}
+.hero{display:grid;grid-template-columns:minmax(0,260px) 1fr;gap:1.5rem;align-items:center}
+.hero img{width:100%;border:1px solid var(--line);border-radius:6px}
+.hero h2{font-size:clamp(2rem,5vw,3.2rem);font-weight:800}
+.hero p{color:var(--mut);margin:.4rem 0 0}
+nav.spy{position:sticky;top:0;z-index:5;display:flex;gap:.4rem;padding:.7rem 0;background:var(--bg);border-bottom:1px solid var(--line);margin-top:1.2rem}
+nav.spy a{padding:.35rem .8rem;border-radius:99px;text-decoration:none;color:var(--mut)}
+nav.spy a.on{background:var(--ink);color:var(--bg)}
+section.blk{padding:2rem 0 1rem;scroll-margin-top:3.5rem}
+section.blk h3{font-size:1.5rem;margin-bottom:1rem}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem;margin:0}
+.facts div{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.8rem}
+.facts dt{color:var(--mut);font-size:.85rem}
+.facts dd{margin:.15rem 0 0;font-weight:600}
+.tabs{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem}
+.tabs button{font:inherit;padding:.4rem .9rem;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--ink);cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chart{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.8rem;min-height:300px}
+.chart svg{width:100%;height:auto;display:block}
+.chart text{fill:var(--mut);font-size:11px}
+.sum{color:var(--mut);margin:.8rem 0 0}
+.note{color:var(--mut);font-size:.85rem;margin-top:2rem}
+@media(max-width:600px){.hero{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}.card{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Country Insights Atlas</h1>
+  <p>Browse every country, then open one to see how its economy, health and emissions have changed over time.</p>
+</header>
+<main id="app" aria-live="polite"></main>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const app = $('#app');
+  const nf = new Intl.NumberFormat('en', {notation: 'compact', maximumFractionDigits: 1});
+  const nf0 = new Intl.NumberFormat('en');
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const IND = {
+    gdp:  ['NY.GDP.PCAP.CD', 'GDP per capita', 'US$'],
+    life: ['SP.DYN.LE00.IN', 'Life expectancy', 'years'],
+    co2:  ['EN.ATM.CO2E.PC', 'CO₂ per capita', 'tonnes'],
+    pop:  ['SP.POP.TOTL', 'Population', 'people']
+  };
+  const FALLBACK = [
+    ['India','IN','IND','Asia',1417000000,3287263,'New Delhi'],['China','CN','CHN','Asia',1412000000,9706961,'Beijing'],
+    ['Brazil','BR','BRA','Americas',214000000,8515767,'Brasília'],['Germany','DE','DEU','Europe',83000000,357114,'Berlin'],
+    ['Kenya','KE','KEN','Africa',53000000,580367,'Nairobi'],['Australia','AU','AUS','Oceania',26000000,7692024,'Canberra']
+  ].map(([n,a,b,r,p,ar,c]) => ({name:{common:n}, cca2:a, cca3:b, region:r, population:p, area:ar, capital:[c],
+    flags:{svg:`https://flagcdn.com/${a.toLowerCase()}.svg`}, languages:{}, currencies:{}}));
+
+  let all = [], list = [], shown = 0, ctrl = null, offline = false;
+  const PAGE = 24;
+  const st = {q:'', region:'', sort:'name'};
+
+  /* ---------- Fetch ---------- */
+  async function loadCountries() {
+    try {
+      const r = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,cca3,flags,region,population,area,capital,languages,currencies');
+      if (!r.ok) throw new Error(r.status);
+      all = (await r.json()).filter(c => c.region);
+    } catch (e) { all = FALLBACK; offline = true; }
+  }
+  async function loadIndicator(code, key, signal) {
+    const u = `https://api.worldbank.org/v2/country/${code}/indicator/${IND[key][0]}?format=json&per_page=80&date=1990:2024`;
+    const r = await fetch(u, {signal});
+    if (!r.ok) throw new Error('World Bank request failed (' + r.status + ')');
+    const j = await r.json();
+    return (j[1] || []).filter(d => d.value != null).map(d => ({x: +d.date, y: d.value})).sort((a, b) => a.x - b.x);
+  }
+
+  /* ---------- History API router (hash URLs work on file:// too) ---------- */
+  function go(url, replace) {
+    try { history[replace ? 'replaceState' : 'pushState']({}, '', url); }
+    catch (e) { location.hash = url.replace(/^#/, ''); }
+    route();
+  }
+  function route() {
+    const [path, qs] = (location.hash.slice(1) || '/').split('?');
+    const p = new URLSearchParams(qs || '');
+    const m = path.match(/^\/country\/([A-Za-z]{2,3})$/);
+    ctrl && ctrl.abort();
+    if (m) return showDetail(m[1].toUpperCase());
+    st.q = p.get('q') || ''; st.region = p.get('region') || ''; st.sort = p.get('sort') || 'name';
+    showGrid();
+  }
+  const gridUrl = () => {
+    const p = new URLSearchParams();
+    for (const k in st) if (st[k] && !(k === 'sort' && st[k] === 'name')) p.set(k, st[k]);
+    return '#/' + (p.toString() ? '?' + p : '');
+  };
+  addEventListener('popstate', route);
+  addEventListener('hashchange', route);
+
+  /* ---------- Intersection Observers ---------- */
+  const reveal = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return;
+    const img = e.target.querySelector('img[data-src]');
+    if (img) { img.src = img.dataset.src; img.removeAttribute('data-src'); }
+    e.target.classList.add('in');
+    reveal.unobserve(e.target);
+  }), {rootMargin: '200px'});
+  let more = null, spy = null;
+
+  /* ---------- Grid view ---------- */
+  function showGrid() {
+    document.title = 'Country Insights Atlas';
+    const regions = [...new Set(all.map(c => c.region))].sort();
+    app.innerHTML = `
+      ${offline ? '<p class="msg">Could not reach the REST Countries API, so a small sample is shown. Check your connection and reload.</p>' : ''}
+      <div class="controls" role="search">
+        <input id="q" type="search" placeholder="Search by country or capital" aria-label="Search countries" value="${esc(st.q)}">
+        <select id="region" aria-label="Filter by region"><option value="">All regions</option>${regions.map(r => `<option ${r === st.region ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>
+        <select id="sort" aria-label="Sort countries">
+          ${[['name','Name A–Z'],['pop','Most populous'],['area','Largest area']].map(([v, l]) => `<option value="${v}" ${v === st.sort ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="grid" id="grid"></div><div id="sentinel"></div>`;
+    let t;
+    $('#q').oninput = e => { st.q = e.target.value; clearTimeout(t); t = setTimeout(() => { history.replaceState({}, '', gridUrl()); build(); }, 200); };
+    $('#region').onchange = e => { st.region = e.target.value; go(gridUrl()); };
+    $('#sort').onchange = e => { st.sort = e.target.value; go(gridUrl()); };
+    more && more.disconnect();
+    more = new IntersectionObserver(es => es[0].isIntersecting && addCards(), {rootMargin: '400px'});
+    more.observe($('#sentinel'));
+    build();
+  }
+  function build() {
+    const q = st.q.trim().toLowerCase();
+    list = all.filter(c => (!st.region || c.region === st.region) &&
+      (!q || c.name.common.toLowerCase().includes(q) || (c.capital || []).join(' ').toLowerCase().includes(q)));
+    const key = {pop: (a, b) => b.population - a.population, area: (a, b) => b.area - a.area,
+      name: (a, b) => a.name.common.localeCompare(b.name.common)}[st.sort] || (() => 0);
+    list.sort(key);
+    $('#grid').innerHTML = ''; shown = 0;
+    $('#count').textContent = list.length + ' countries';
+    if (!list.length) $('#grid').innerHTML = '<p class="msg">No countries match. Clear the search or pick another region.</p>';
+    addCards();
+  }
+  function addCards() {
+    const max = Math.max(...all.map(c => c.population), 1);
+    const html = list.slice(shown, shown + PAGE).map(c => `
+      <a class="card" href="#/country/${c.cca2}" data-code="${c.cca2}">
+        <img class="flag" alt="Flag of ${esc(c.name.common)}" data-src="${esc(c.flags.svg || c.flags.png)}" loading="lazy">
+        <div><h3>${esc(c.name.common)}</h3>
+        <small>${esc(c.region)} · ${nf.format(c.population)} people</small>
+        <span class="pop" title="Population relative to the largest country"><i style="width:${Math.max(2, c.population / max * 100)}%"></i></span></div>
+      </a>`).join('');
+    const grid = $('#grid'); if (!grid) return;
+    const before = grid.children.length;
+    grid.insertAdjacentHTML('beforeend', html);
+    [...grid.children].slice(before).forEach(el => el.classList && reveal.observe(el));
+    shown += PAGE;
+  }
+
+  /* ---------- Detail view ---------- */
+  async function showDetail(code) {
+    more && more.disconnect(); spy && spy.disconnect();
+    if (!all.length) await loadCountries();
+    const c = all.find(x => x.cca2 === code || x.cca3 === code);
+    if (!c) { app.innerHTML = '<a class="back" href="#/">Back to all countries</a><p class="msg">That country was not found.</p>'; return; }
+    document.title = c.name.common + ' · Country Insights Atlas';
+    scrollTo(0, 0);
+    const langs = Object.values(c.languages || {}).join(', ') || 'Not listed';
+    const cur = Object.values(c.currencies || {}).map(x => x.name + (x.symbol ? ' (' + x.symbol + ')' : '')).join(', ') || 'Not listed';
+    const fact = (k, v) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`;
+    app.innerHTML = `
+      <a class="back" href="#/" id="back">Back to all countries</a>
+      <div class="hero"><img alt="Flag of ${esc(c.name.common)}" src="${esc(c.flags.svg || c.flags.png)}">
+        <div><h2>${esc(c.name.common)}</h2><p>${esc((c.capital || ['No capital listed'])[0])} · ${esc(c.region)}</p></div></div>
+      <nav class="spy" aria-label="Sections"><a href="#" data-t="overview" class="on">Overview</a><a href="#" data-t="trends">Trends</a></nav>
+      <section class="blk" id="overview"><h3>Overview</h3><dl class="facts">
+        ${fact('Population', nf0.format(c.population))}${fact('Area', nf0.format(c.area) + ' km²')}
+        ${fact('Density', c.area ? nf0.format(Math.round(c.population / c.area)) + ' per km²' : 'n/a')}
+        ${fact('Languages', langs)}${fact('Currency', cur)}${fact('Code', c.cca2 + ' / ' + c.cca3)}</dl></section>
+      <section class="blk" id="trends"><h3>Trends since 1990</h3>
+        <div class="tabs" role="group" aria-label="Indicator">${Object.entries(IND).map(([k, v], i) => `<button data-k="${k}" aria-pressed="${i === 0}">${v[1]}</button>`).join('')}</div>
+        <div class="chart" id="chart"></div><p class="sum" id="sum"></p>
+        <p class="note">Data: REST Countries and World Bank Open Data. Some years are missing for some countries.</p></section>`;
+    $('#back').onclick = e => { if (history.length > 1 && st) { e.preventDefault(); go(gridUrl()); } };
+    document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+      document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-pressed', x === b));
+      drawIndicator(c, b.dataset.k);
+    });
+    document.querySelectorAll('nav.spy a').forEach(a => a.onclick = e => { e.preventDefault(); document.getElementById(a.dataset.t).scrollIntoView(); });
+    spy = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting) document.querySelectorAll('nav.spy a').forEach(a => a.classList.toggle('on', a.dataset.t === e.target.id));
+    }), {rootMargin: '-35% 0px -55% 0px'});
+    document.querySelectorAll('section.blk').forEach(s => spy.observe(s));
+    drawIndicator(c, 'gdp');
+  }
+  async function drawIndicator(c, key) {
+    ctrl && ctrl.abort(); ctrl = new AbortController();
+    const box = $('#chart'); $('#sum').textContent = '';
+    box.innerHTML = '<p class="msg">Loading ' + IND[key][1].toLowerCase() + '…</p>';
+    try {
+      const pts = await loadIndicator(c.cca2, key, ctrl.signal);
+      if (pts.length < 2) { box.innerHTML = '<p class="msg">The World Bank has no usable data for this indicator and country.</p>'; return; }
+      box.innerHTML = lineChart(pts, IND[key]);
+      const a = pts[0], b = pts[pts.length - 1], ch = (b.y - a.y) / a.y * 100;
+      $('#sum').textContent = `${IND[key][1]} went from ${nf.format(a.y)} in ${a.x} to ${nf.format(b.y)} in ${b.x} (${ch >= 0 ? '+' : ''}${ch.toFixed(0)}%).`;
+    } catch (e) {
+      if (e.name !== 'AbortError') box.innerHTML = '<p class="msg">Could not load this indicator. Check your connection and select it again.</p>';
+    }
+  }
+  function lineChart(pts, [, label, unit]) {
+    const W = 640, H = 300, L = 54, R = 16, T = 16, B = 32;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(0, ...ys), y1 = Math.max(...ys) * 1.05;
+    const X = v => L + (v - x0) / (x1 - x0) * (W - L - R), Y = v => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
+    const grid = [0, .25, .5, .75, 1].map(f => { const v = y0 + f * (y1 - y0), y = Y(v);
+      return `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L - 6}" y="${y + 4}" text-anchor="end">${nf.format(v)}</text>`; }).join('');
+    const ticks = [x0, Math.round((x0 + x1) / 2), x1].map(v => `<text x="${X(v)}" y="${H - 10}" text-anchor="middle">${v}</text>`).join('');
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1)).join('');
+    const dots = pts.map(p => `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="4" fill="var(--accent)" opacity="0"><title>${p.x}: ${nf0.format(Math.round(p.y * 10) / 10)} ${unit}</title></circle>`).join('');
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${label} over time, ${unit}">${grid}${ticks}
+      <path d="${d}L${X(x1)} ${Y(y0)}L${X(x0)} ${Y(y0)}Z" fill="var(--accent)" opacity=".12"/>
+      <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>${dots}
+      <circle cx="${X(x1)}" cy="${Y(pts[pts.length - 1].y)}" r="5" fill="var(--mark)"/></svg>`;
+  }
+  document.addEventListener('mouseover', e => { if (e.target.tagName === 'circle') e.target.setAttribute('opacity', 1); });
+  document.addEventListener('mouseout', e => { if (e.target.tagName === 'circle' && e.target.getAttribute('r') === '4') e.target.setAttribute('opacity', 0); });
+
+  app.innerHTML = '<p class="msg">Loading countries…</p>';
+  loadCountries().then(route);
+})();
+</script>
+</body>
+</html>
